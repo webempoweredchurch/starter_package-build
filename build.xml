@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ * Modified (ie. simplifed) version of the TYPO3 build scripts from       *
+ * http://forge.typo3.org/projects/typo3v4-distribution                   *
+ *                                                                        *
+ * It is free software; you can redistribute it and/or modify it under    *
+ * the terms of the GNU Lesser General Public License as published by the *
+ * Free Software Foundation, either version 3 of the License, or (at your *
+ * option) any later version.                                             *
+ *                                                                        *
+ * This script is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHAN-    *
+ * TABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser       *
+ * General Public License for more details.                               *
+ *                                                                        *
+ * You should have received a copy of the GNU Lesser General Public       *
+ * License along with the script.                                         *
+ * If not, see http://www.gnu.org/licenses/lgpl.html                      *
+ *                                                                        *
+ * The TYPO3 project - inspiring people to share!                         *
+-->
+<project name="TYPO3v4WECStarterPackage" basedir="." default="wec">
+	<php function="dirname" returnProperty="build.basedir"><param value="${phing.file}" /></php>
+
+	<property name="wec.repository" value="git://github.com/webempoweredchurch/starter_package.git" />
+	<property name="wec.workDirectory" value="${project.workDirectory}Targets/WEC/" />
+	<property name="project.targetsDirectory" value="${build.basedir}/Targets/" />
+	<property name="project.workDirectory" value="${build.basedir}/Work/" />
+
+	<exec logoutput="false" checkreturn="true" command="git --exec-path" outputProperty="project.gitPath" />
+	<property name="project.gitPath" value="${project.gitPath}/git" override="true" />
+
+	<target name="wec" depends="project-initialize">
+		<phingcall target="wec-execute" />
+	</target>
+
+	<target name="wec-execute">
+		<delete dir="${wec.workDirectory}" quiet="true" />
+		<mkdir dir="${wec.workDirectory}" />
+
+		<phingcall target="repository-export">
+			<property name="repository-export.gitName" value="master" />
+			<property name="repository-export.gitRepository" value="${wec.repository}" />
+			<property name="repository-export.directory" value="${wec.workDirectory}" />
+		</phingcall>
+
+		<property name="wec.packageName" value="wec_starter" />
+		<property name="wec.gitName" value="master" />
+
+		<phingcall target="wec-package-targz" />
+		<phingcall target="wec-package-zip" />
+	</target>
+
+	<target name="wec-package-targz">
+		<delete file="${project.targetsDirectory}${wec.packageName}.tar.gz" quiet="true"/>
+
+		<echo message="Creating ${wec.packageName}.tar.gz" />
+		<exec logoutput="true" checkreturn="true"
+			command="cd &quot;${wec.workDirectory}&quot;; tar -czf &quot;${project.targetsDirectory}${wec.packageName}.tar.gz&quot; ." />
+	</target>
+
+	<target name="wec-package-zip">
+		<delete file="${project.targetsDirectory}${wec.packageName}.zip" quiet="true"/>
+
+		<echo message="Creating ${wec.packageName}.zip" />
+		<exec logoutput="true" checkreturn="true"
+			command="cd &quot;${wec.workDirectory}&quot;; zip -rq &quot;${project.targetsDirectory}${wec.packageName}.zip&quot; . -x \*typo3_src\*" />
+	</target>
+
+
+	<target name="project-initialize">
+		<delete dir="${project.targetsDirectory}" quiet="true" />
+		<mkdir dir="${project.targetsDirectory}" />
+	</target>
+
+
+	<target name="repository-export">
+		<delete dir="${project.workDirectory}Temporary.git/" quiet="true" />
+
+		<fail unless="repository-export.gitName" message="Property $repository-dump.gitName is required." />
+		<fail unless="repository-export.gitRepository" message="Propery $repository-dump.gitRepository is required." />
+		<fail unless="repository-export.directory" message="Propery $repository-dump.directory is required." />
+
+		<exec logoutput="false" checkreturn="false"
+			outputProperty="repository-export.gitNameFound"
+			command="git ls-remote --heads ${repository-export.gitRepository} ${repository-export.gitName}" />
+
+		<if>
+			<not><contains string="${repository-export.gitNameFound}" substring="${repository-export.gitName}"/></not>
+			<then>
+				<echo msg="Branch ${repository-export.gitName} was not found, using ${repository-export.gitNameDefault} instead" />
+				<property name="repository-export.gitNameAvailable" value="${repository-export.gitNameDefault}" />
+			</then>
+			<else>
+				<property name="repository-export.gitNameAvailable" value="${repository-export.gitName}" />
+			</else>
+		</if>
+
+		<exec logoutput="true" checkreturn="true"
+			command="git clone -b ${repository-export.gitNameAvailable} --recursive ${repository-export.gitRepository} &quot;${project.workDirectory}Temporary.git/&quot;" />
+
+		<phingcall target="repository-dump">
+			<property name="repository-dump.gitDirectory" value="${project.workDirectory}Temporary.git/" />
+			<property name="repository-dump.gitName" value="${repository-export.gitNameAvailable}" />
+			<property name="repository-dump.directory" value="${repository-export.directory}" />
+		</phingcall>
+	</target>
+
+	<target name="repository-dump">
+		<fail unless="repository-dump.gitName" message="Property $repository-dump.gitName is required." />
+		<fail unless="repository-dump.directory" message="Propery $repository-dump.directory is required." />
+		<property name="repository-dump.gitDirectory" value="${project.localRepositoryDirectory}" />
+
+		<delete dir="${repository-dump.directory}" quiet="true" />
+		<mkdir dir="${repository-dump.directory}" />
+
+		<phingcall target="repository-select">
+			<property name="repository-select.branch" value="${repository-dump.gitName}" />
+			<property name="repository-select.gitDirectory" value="${repository-dump.gitDirectory}" />
+		</phingcall>
+
+		<exec logoutput="true" checkreturn="true"
+			dir="${repository-dump.gitDirectory}"
+			command="git checkout-index -a --prefix=&quot;${repository-dump.directory}&quot;" />
+		<exec logoutput="true" checkreturn="true"
+			dir="${repository-dump.gitDirectory}"
+			command="git submodule foreach 'git checkout-index -a --prefix=&quot;${repository-dump.directory}$path/&quot;'" />
+
+		<delete>
+			<fileset dir="${repository-dump.directory}" defaultexcludes="false">
+				<include name=".gitignore" />
+				<include name=".gitmodules" />
+				<!--
+				<include name="**/src" />
+				<include name="**/src/**" />
+				-->
+				<include name="**/tests" />
+				<include name="**/tests/**" />
+				<include name=".svn" />
+				<include name="**/.svn" />
+				<include name="**/.svn/**" />
+				<include name="CVS" />
+				<include name="SVNreadme.txt" />
+				<include name="*.webprj" />
+				<include name="*.orig" />
+				<include name="*~" />
+			</fileset>
+		</delete>
+	</target>
+
+	<target name="repository-clone">
+		<available file="${project.localRepositoryDirectory}.git" type="dir" property="repository-clone.exists" />
+		<if>
+			<and>
+				<isset property="repository-clone.exists" />
+				<istrue value="${skipClone}" />
+			</and>
+			<then>
+				<exec logoutput="true" checkreturn="true"
+					dir="${project.localRepositoryDirectory}"
+					command="git clean -df" />
+
+				<exec logoutput="true" checkreturn="true"
+					dir="${project.localRepositoryDirectory}"
+					command="git checkout master" />
+				<exec logoutput="true" checkreturn="true"
+					dir="${project.localRepositoryDirectory}"
+					command="git reset --hard origin/master" />
+
+				<exec logoutput="true" checkreturn="true"
+					dir="${project.localRepositoryDirectory}"
+					command="git clean -df" />
+				<exec logoutput="true" checkreturn="true"
+					dir="${project.localRepositoryDirectory}"
+					command="git pull" />
+				<exec logoutput="true" checkreturn="true"
+					dir="${project.localRepositoryDirectory}"
+					command="git fetch --tags" />
+				<exec logoutput="true" checkreturn="true"
+					dir="${project.localRepositoryDirectory}"
+					command="git submodule --quiet update --init" />
+				</then>
+			<else>
+				<delete dir="${project.localRepositoryDirectory}" quiet="true" />
+				<mkdir dir="${project.localRepositoryDirectory}" />
+
+				<exec logoutput="true" checkreturn="true"
+					command="git clone --recursive ${git.remoteRepository} &quot;${project.localRepositoryDirectory}&quot;" />
+			</else>
+		</if>
+	</target>
+
+
+	<target name="repository-select">
+		<fail unless="repository-select.branch" message="Property $repository-select.branch is required." />
+		<property name="repository-select.gitDirectory" value="${project.localRepositoryDirectory}" />
+		<property name="repository-select.resetHard" value="false" />
+
+		<gitcheckout
+			gitPath="${project.gitPath}"
+			repository="${repository-select.gitDirectory}"
+			branchname="${repository-select.branch}" />
+
+		<if>
+			<istrue value="${repository-select.resetHard}" />
+			<then>
+				<exec logoutput="true" checkreturn="true"
+					dir="${repository-select.gitDirectory}"
+					command="git reset --hard origin/${repository-select.branch}" />
+			</then>
+		</if>
+
+		<exec logoutput="true" checkreturn="true"
+			dir="${repository-select.gitDirectory}"
+			command="git submodule update --init" />
+	</target>
+
+</project>
