@@ -124,18 +124,18 @@
 			command="git checkout-index -a --prefix=&quot;${repository-dump.directory}&quot;" />
 		<exec logoutput="true" checkreturn="true"
 			dir="${repository-dump.gitDirectory}"
-			command="git submodule foreach 'git checkout-index -a --prefix=&quot;${repository-dump.directory}$path/&quot;'" />
+			command="git submodule foreach --recursive 'git checkout-index -a --prefix=&quot;${repository-dump.directory}$path/&quot;'" />
 
 		<delete>
 			<fileset dir="${repository-dump.directory}" defaultexcludes="false">
 				<include name=".gitignore" />
 				<include name=".gitmodules" />
-				<!--
-				<include name="**/src" />
-				<include name="**/src/**" />
-				-->
-				<include name="**/tests" />
-				<include name="**/tests/**" />
+				<include name="**/.gitignore" />
+				<include name="**/.gitmodules" />
+				<include name="typo3_src*/**/src/" />
+				<include name="typo3_src*/**/src/**" />
+				<include name="**/tests\/" />
+				<include name="**/tests\/**" />
 				<include name=".svn" />
 				<include name="**/.svn" />
 				<include name="**/.svn/**" />
